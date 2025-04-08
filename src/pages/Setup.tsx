@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { draftChannel } from '../utils/pusher';
+import { draftChannel, isConnected } from '../utils/pusher';
 import { useToast } from "@/components/ui/use-toast";
 
 const Setup = () => {
@@ -31,10 +31,36 @@ const Setup = () => {
       return;
     }
 
+    // Check Pusher configuration
+    if (!import.meta.env.VITE_PUSHER_KEY || !import.meta.env.VITE_PUSHER_CLUSTER) {
+      console.error('Missing Pusher configuration:', {
+        key: import.meta.env.VITE_PUSHER_KEY ? 'present' : 'missing',
+        cluster: import.meta.env.VITE_PUSHER_CLUSTER ? 'present' : 'missing'
+      });
+      toast({
+        variant: "destructive",
+        title: "Configuration Error",
+        description: "Pusher configuration is missing. Please check environment variables."
+      });
+      return;
+    }
+
+    // Check Pusher connection
+    if (!isConnected()) {
+      console.error('Pusher is not connected');
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Not connected to Pusher. Please check your internet connection."
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {
       const id = generateDraftId();
+      console.log('Generated draft ID:', id);
       
       // Create draft info
       const draftInfo = {
@@ -44,7 +70,7 @@ const Setup = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // Initialize the draft channel
+      console.log('Initializing draft channel...');
       const channel = draftChannel(id);
 
       // Store draft info in localStorage first
@@ -60,22 +86,26 @@ const Setup = () => {
       // Wait for subscription to succeed
       await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
+          console.error('Subscription timeout after 5 seconds');
           reject(new Error('Subscription timeout'));
         }, 5000);
 
         channel.bind('pusher:subscription_succeeded', () => {
+          console.log('Successfully subscribed to channel');
           clearTimeout(timeoutId);
           resolve(true);
         });
 
         channel.bind('pusher:subscription_error', (error: any) => {
+          console.error('Subscription error:', error);
           clearTimeout(timeoutId);
-          reject(error);
+          reject(new Error(`Subscription error: ${JSON.stringify(error)}`));
         });
       });
 
       // Now that we're subscribed, trigger the event
       try {
+        console.log('Triggering client-init-draft event...');
         channel.trigger('client-init-draft', {
           draftInfo,
           status: {
@@ -91,16 +121,28 @@ const Setup = () => {
           description: "Share the links with team captains"
         });
       } catch (triggerError) {
-        throw new Error('Failed to initialize draft');
+        console.error('Error triggering client event:', triggerError);
+        throw new Error(`Failed to initialize draft: ${triggerError.message}`);
       }
 
     } catch (error) {
       console.error('Error creating draft:', error);
       localStorage.removeItem(`draft-${draftId}`); // Clean up if failed
+      
+      // Provide more specific error messages
+      let errorMessage = "Please try again in a few moments";
+      if (error.message.includes('Subscription timeout')) {
+        errorMessage = "Connection timed out. Please check your internet connection.";
+      } else if (error.message.includes('Subscription error')) {
+        errorMessage = "Failed to connect to draft room. Please check your Pusher configuration.";
+      } else if (error.message.includes('client event')) {
+        errorMessage = "Failed to initialize draft room. Make sure client events are enabled in Pusher.";
+      }
+      
       toast({
         variant: "destructive",
         title: "Error Creating Draft",
-        description: "Please try again in a few moments"
+        description: errorMessage
       });
       setDraftId(""); // Reset draft ID if failed
     } finally {
