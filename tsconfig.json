@@ -33,6 +33,6 @@
   },
   "include": [
     "src",
-    "api/**/*.ts"
+    "api/**/*.cts"
   ]
 }
