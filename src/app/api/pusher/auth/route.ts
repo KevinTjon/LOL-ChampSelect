@@ -19,11 +19,22 @@ export async function POST(req: Request) {
       clusterExists: !!process.env.VITE_PUSHER_CLUSTER
     });
 
-    const data = await req.json();
-    console.log('Auth request received for channel:', data.channel_name);
+    let socketId: string;
+    let channel: string;
 
-    const socketId = data.socket_id;
-    const channel = data.channel_name;
+    // Check content type and parse accordingly
+    const contentType = req.headers.get('content-type');
+    if (contentType?.includes('application/x-www-form-urlencoded')) {
+      const formData = await req.formData();
+      socketId = formData.get('socket_id') as string;
+      channel = formData.get('channel_name') as string;
+    } else {
+      const data = await req.json();
+      socketId = data.socket_id;
+      channel = data.channel_name;
+    }
+
+    console.log('Auth request received for:', { socketId, channel });
 
     if (!socketId || !channel) {
       console.error('Missing socket_id or channel_name');

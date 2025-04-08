@@ -8,6 +8,7 @@ const pusher = new Pusher(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PU
     endpoint: '/api/pusher/auth',
     transport: 'ajax',
     headers: {
+      'Content-Type': 'application/json',
       // Add CSRF token if available
       ...(typeof document !== 'undefined' && document.querySelector('meta[name="csrf-token"]')
         ? { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '' }
