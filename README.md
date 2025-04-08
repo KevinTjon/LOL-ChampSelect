@@ -1,4 +1,52 @@
-# Welcome to your Lovable project
+# LOL Champ Select
+
+A League of Legends champion selection and draft arena application.
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies:
+```bash
+npm install
+```
+3. Start the development server:
+```bash
+npm run dev
+```
+
+## Features
+
+- Champion selection interface
+- Draft arena functionality
+- Real-time updates
+
+## Technologies Used
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui components
+
+## Development
+
+The project uses:
+- React with TypeScript for the frontend
+- Vite as the build tool
+- Tailwind CSS for styling
+- shadcn/ui for component library
+- React Router for navigation
+- React Query for data fetching
+- Zod for validation
+
+## Deployment
+
+This project can be deployed to any static hosting service that supports Vite/React applications, such as:
+- Vercel
+- Netlify
+- GitHub Pages
+- AWS Amplify
+- Firebase Hosting
 
 ## Project info
 
@@ -49,16 +97,6 @@ npm run dev
 - Select the "Codespaces" tab.
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
 
 ## How can I deploy this project?
 
