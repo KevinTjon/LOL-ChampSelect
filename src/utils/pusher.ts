@@ -24,42 +24,33 @@ console.log('Pusher Environment Check:', {
   clusterExists: !!import.meta.env.VITE_PUSHER_CLUSTER,
 });
 
-// Connection state handling
-pusher.connection.bind('state_change', ({ current }: { current: string }) => {
-  switch (current) {
-    case 'connecting':
-      console.log('Connecting to Pusher...');
-      break;
-    case 'connected':
-      console.log('Connected to Pusher');
-      break;
-    case 'disconnected':
-      console.log('Disconnected from Pusher');
-      break;
-    case 'failed':
-      console.log('Connection to Pusher failed');
-      // Try to reconnect after 3 seconds
-      setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        pusher.connect();
-      }, 3000);
-      break;
-    default:
-      break;
+// More detailed connection state logging
+pusher.connection.bind('state_change', (states: { previous: string; current: string }) => {
+  console.log(
+    `Pusher connection state changed from ${states.previous} to ${states.current}`
+  );
+});
+
+pusher.connection.bind('error', (err: any) => {
+  console.error('Pusher connection error:', err);
+  if (err.error && err.error.data && err.error.data.code) {
+    console.error(`Pusher error code: ${err.error.data.code}`);
   }
 });
 
 // Helper function to get a draft channel
 export const draftChannel = (draftId: string) => {
-  const channel = pusher.subscribe(`private-draft-${draftId}`);
+  const channelName = `private-draft-${draftId}`;
+  console.log(`Attempting to subscribe to channel: ${channelName}`);
+  const channel = pusher.subscribe(channelName);
   
   // Channel state handling
   channel.bind('pusher:subscription_error', (error: any) => {
-    console.error('Draft channel subscription error:', error);
+    console.error(`Draft channel (${channelName}) subscription error:`, error);
   });
 
   channel.bind('pusher:subscription_succeeded', () => {
-    console.log('Successfully subscribed to draft channel');
+    console.log(`Successfully subscribed to draft channel: ${channelName}`);
   });
 
   return channel;
@@ -67,7 +58,9 @@ export const draftChannel = (draftId: string) => {
 
 // Helper function to unsubscribe from a draft channel
 export const unsubscribeFromDraft = (draftId: string) => {
-  pusher.unsubscribe(`private-draft-${draftId}`);
+  const channelName = `private-draft-${draftId}`;
+  console.log(`Unsubscribing from channel: ${channelName}`);
+  pusher.unsubscribe(channelName);
 };
 
 // Helper function to check connection state
@@ -76,6 +69,7 @@ export const isConnected = () => pusher.connection.state === 'connected';
 // Helper function to manually reconnect
 export const reconnect = () => {
   if (pusher.connection.state !== 'connected') {
+    console.log('Attempting Pusher reconnect...');
     pusher.connect();
   }
 };
@@ -83,8 +77,11 @@ export const reconnect = () => {
 // Helper function to trigger events on a channel
 export const triggerEvent = (channelName: string, eventName: string, data: any) => {
   const channel = pusher.channel(channelName);
-  if (channel) {
+  if (channel && channel.subscribed) {
+    console.log(`Triggering event '${eventName}' on channel '${channelName}'`);
     channel.trigger(eventName, data);
+  } else {
+    console.warn(`Cannot trigger event '${eventName}' on channel '${channelName}': Channel not found or not subscribed.`);
   }
 };
 
