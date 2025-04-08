@@ -1,22 +1,23 @@
 import { NextResponse } from 'next/server';
 import Pusher from 'pusher';
 
+// Use environment variables directly without VITE_ prefix for server-side
 const pusher = new Pusher({
-  appId: process.env.VITE_PUSHER_APP_ID || '',
-  key: process.env.VITE_PUSHER_KEY || '',
-  secret: process.env.VITE_PUSHER_SECRET || '',
-  cluster: process.env.VITE_PUSHER_CLUSTER || '',
+  appId: process.env.PUSHER_APP_ID || '',
+  key: process.env.PUSHER_KEY || '',
+  secret: process.env.PUSHER_SECRET || '',
+  cluster: process.env.PUSHER_CLUSTER || '',
   useTLS: true,
 });
 
 export async function POST(req: Request) {
   try {
-    // Log environment variables (redacted for security)
-    console.log('Auth endpoint environment check:', {
-      appIdExists: !!process.env.VITE_PUSHER_APP_ID,
-      keyExists: !!process.env.VITE_PUSHER_KEY,
-      secretExists: !!process.env.VITE_PUSHER_SECRET,
-      clusterExists: !!process.env.VITE_PUSHER_CLUSTER
+    // Log environment variables used by the function (redacted for security)
+    console.log('Auth endpoint server environment check:', {
+      appIdExists: !!process.env.PUSHER_APP_ID,
+      keyExists: !!process.env.PUSHER_KEY,
+      secretExists: !!process.env.PUSHER_SECRET,
+      clusterExists: !!process.env.PUSHER_CLUSTER
     });
 
     let socketId: string;
@@ -47,38 +48,40 @@ export async function POST(req: Request) {
     // For presence channels
     if (channel.startsWith('presence-')) {
       const presenceData = {
-        user_id: 'unique_user_id', // You should get this from your auth system
+        user_id: 'unique_user_id', // Replace with actual user ID from your auth system
         user_info: {
-          name: 'Anonymous User', // You can customize this based on your needs
+          name: 'Anonymous User', // Customize as needed
         }
       };
       
       const auth = pusher.authorizeChannel(socketId, channel, presenceData);
+      console.log('Presence channel auth successful for:', channel);
       return NextResponse.json(auth);
     }
     
     // For private channels
     if (channel.startsWith('private-')) {
-      // Here you can add your custom authorization logic
-      // For example, check if the user should have access to this draft
       if (channel.startsWith('private-draft-')) {
-        // For now, we'll authorize all draft channels
-        // In production, you should check if the user has access to this draft
         const auth = pusher.authorizeChannel(socketId, channel);
+        console.log('Private channel auth successful for:', channel);
         return NextResponse.json(auth);
       }
     }
 
-    // If not a private or presence channel, or channel type not supported
+    console.warn('Unsupported channel type attempted:', channel);
     return NextResponse.json(
       { error: 'Channel type not supported' },
       { status: 403 }
     );
 
   } catch (error) {
-    console.error('Auth error:', error);
+    // Log the specific error that occurred
+    console.error('Auth error:', error instanceof Error ? error.message : error);
+    if (error instanceof Error && error.stack) {
+      console.error('Auth error stack:', error.stack);
+    }
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error during authentication' },
       { status: 500 }
     );
   }
