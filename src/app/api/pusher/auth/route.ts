@@ -29,30 +29,27 @@ export async function POST(req: Request): Promise<Response> {
     const contentType = req.headers.get('content-type');
     console.log('Auth request content-type:', contentType);
 
-    let requestBody: PusherAuthRequestBody;
     let socketId: string | undefined;
     let channel: string | undefined;
 
-    try {
-      // Check content type and parse accordingly
-      if (contentType?.includes('application/x-www-form-urlencoded')) {
-        const formData = await req.formData();
-        socketId = formData.get('socket_id')?.toString();
-        channel = formData.get('channel_name')?.toString();
-        console.log('Form data parsed:', { socketId, channel });
-      } else {
-        // Assume JSON
-        requestBody = await req.json() as PusherAuthRequestBody;
-        socketId = requestBody.socket_id;
-        channel = requestBody.channel_name;
+    // Handle URL-encoded form data
+    const formData = await req.formData().catch(() => null);
+    if (formData) {
+      socketId = formData.get('socket_id')?.toString();
+      channel = formData.get('channel_name')?.toString();
+      console.log('Form data parsed:', { socketId, channel });
+    }
+
+    // If form data parsing failed, try JSON
+    if (!socketId || !channel) {
+      try {
+        const jsonData = await req.clone().json() as PusherAuthRequestBody;
+        socketId = jsonData.socket_id;
+        channel = jsonData.channel_name;
         console.log('JSON data parsed:', { socketId, channel });
+      } catch (e) {
+        console.error('Failed to parse JSON:', e);
       }
-    } catch (parseError) {
-      console.error('Error parsing request:', parseError);
-      return new Response(JSON.stringify({ error: 'Invalid request format' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
     }
 
     // Ensure required parameters are present
