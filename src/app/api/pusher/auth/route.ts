@@ -1,4 +1,7 @@
 import Pusher from 'pusher';
+import { NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 
 // Define the expected request body structure
 interface PusherAuthRequestBody {
@@ -23,90 +26,62 @@ const pusher = new Pusher({
   useTLS: true,
 });
 
-export async function POST(req: Request): Promise<Response> {
+export async function POST(request: Request) {
   try {
     // Log request details
-    const contentType = req.headers.get('content-type');
+    const contentType = request.headers.get('content-type');
     console.log('Auth request content-type:', contentType);
 
     let socketId: string | undefined;
     let channel: string | undefined;
 
-    // Get the raw text first
-    const rawBody = await req.text();
-    console.log('Raw request body:', rawBody);
-
-    // Try to parse as URLSearchParams first (for form data)
-    try {
-      const params = new URLSearchParams(rawBody);
+    // Handle both form data and JSON
+    if (contentType?.includes('application/x-www-form-urlencoded')) {
+      const text = await request.text();
+      const params = new URLSearchParams(text);
       socketId = params.get('socket_id') || undefined;
       channel = params.get('channel_name') || undefined;
-      console.log('Form data parsed:', { socketId, channel });
-    } catch (e) {
-      console.log('Not valid form data, trying JSON');
-      // If not form data, try JSON
-      try {
-        const jsonData = JSON.parse(rawBody) as PusherAuthRequestBody;
-        socketId = jsonData.socket_id;
-        channel = jsonData.channel_name;
-        console.log('JSON data parsed:', { socketId, channel });
-      } catch (e) {
-        console.error('Failed to parse JSON:', e);
-      }
+    } else {
+      const body = await request.json();
+      socketId = body.socket_id;
+      channel = body.channel_name;
     }
 
-    // Ensure required parameters are present
+    // Log parsed data
+    console.log('Parsed request data:', { socketId, channel });
+
+    // Validate required parameters
     if (!socketId || !channel) {
-      console.error('Missing required parameters:', { socketId, channel });
-      return new Response(JSON.stringify({ error: 'Missing socket_id or channel_name' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return NextResponse.json(
+        { error: 'Missing socket_id or channel_name' },
+        { status: 400 }
+      );
     }
 
-    // For private channels
+    // Handle private channels
     if (channel.startsWith('private-')) {
       try {
-        const auth = pusher.authorizeChannel(socketId, channel);
-        console.log('Private channel auth successful:', { channel, auth });
-        return new Response(JSON.stringify(auth), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      } catch (authError) {
-        console.error('Error authorizing channel:', authError);
-        return new Response(JSON.stringify({ 
-          error: 'Authorization failed', 
-          details: authError instanceof Error ? authError.message : String(authError)
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        const authResponse = pusher.authorizeChannel(socketId, channel);
+        return NextResponse.json(authResponse);
+      } catch (error) {
+        console.error('Authorization error:', error);
+        return NextResponse.json(
+          { error: 'Failed to authorize channel' },
+          { status: 500 }
+        );
       }
     }
 
-    console.warn('Unsupported channel type:', channel);
-    return new Response(JSON.stringify({ error: 'Channel type not supported' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(
+      { error: 'Channel type not supported' },
+      { status: 403 }
+    );
 
   } catch (error) {
     console.error('Auth endpoint error:', error);
-    if (error instanceof Error) {
-      console.error('Error stack:', error.stack);
-      return new Response(JSON.stringify({ 
-        error: 'Internal server error',
-        message: error.message,
-        stack: error.stack
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    return new Response(JSON.stringify({ error: 'Unknown error occurred' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 
