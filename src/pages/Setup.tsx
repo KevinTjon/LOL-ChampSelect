@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { draftChannel } from '../utils/pusher';
+import { useToast } from "@/components/ui/use-toast";
 
 const Setup = () => {
   const [blueTeamName, setBlueTeamName] = useState("");
   const [redTeamName, setRedTeamName] = useState("");
   const [draftId, setDraftId] = useState("");
   const [linksGenerated, setLinksGenerated] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
 
   const generateDraftId = () => {
     // Generate a random 6-character string
@@ -18,36 +21,66 @@ const Setup = () => {
     return id;
   };
 
-  const handleCreateDraft = () => {
+  const handleCreateDraft = async () => {
     if (!blueTeamName || !redTeamName) {
-      alert("Please enter names for both teams");
+      toast({
+        variant: "destructive",
+        title: "Missing Team Names",
+        description: "Please enter names for both teams"
+      });
       return;
     }
 
-    const id = generateDraftId();
-    
-    // Create draft info
-    const draftInfo = {
-      draftId: id,
-      blueTeamName,
-      redTeamName,
-      createdAt: new Date().toISOString(),
-    };
+    setIsCreating(true);
 
-    // Initialize the draft channel
-    const channel = draftChannel(id);
-    
-    // Send initial draft info through Pusher
-    channel.trigger('client-init-draft', {
-      draftInfo,
-      status: {
-        blueTeamReady: false,
-        redTeamReady: false,
-        isStarting: false
-      }
-    });
+    try {
+      const id = generateDraftId();
+      
+      // Create draft info
+      const draftInfo = {
+        draftId: id,
+        blueTeamName,
+        redTeamName,
+        createdAt: new Date().toISOString(),
+      };
 
-    setLinksGenerated(true);
+      // Initialize the draft channel and wait for subscription
+      const channel = draftChannel(id);
+
+      // Wait for subscription to succeed
+      await new Promise((resolve, reject) => {
+        channel.bind('pusher:subscription_succeeded', resolve);
+        channel.bind('pusher:subscription_error', reject);
+
+        // Timeout after 5 seconds
+        setTimeout(() => reject(new Error('Subscription timeout')), 5000);
+      });
+
+      // Now that we're subscribed, send the initial draft info
+      channel.trigger('client-init-draft', {
+        draftInfo,
+        status: {
+          blueTeamReady: false,
+          redTeamReady: false,
+          isStarting: false
+        }
+      });
+
+      setLinksGenerated(true);
+      toast({
+        title: "Draft Room Created",
+        description: "Share the links with team captains"
+      });
+    } catch (error) {
+      console.error('Error creating draft:', error);
+      toast({
+        variant: "destructive",
+        title: "Error Creating Draft",
+        description: "Please try again"
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -68,6 +101,7 @@ const Setup = () => {
                 onChange={(e) => setBlueTeamName(e.target.value)}
                 className="bg-gray-800 border-lol-blue text-white"
                 placeholder="Enter blue team name"
+                disabled={isCreating}
               />
             </div>
 
@@ -80,6 +114,7 @@ const Setup = () => {
                 onChange={(e) => setRedTeamName(e.target.value)}
                 className="bg-gray-800 border-lol-red text-white"
                 placeholder="Enter red team name"
+                disabled={isCreating}
               />
             </div>
           </div>
@@ -88,8 +123,9 @@ const Setup = () => {
             <Button
               onClick={handleCreateDraft}
               className="bg-lol-gold hover:bg-lol-lightGold text-black font-semibold px-8 py-2"
+              disabled={isCreating}
             >
-              Create Draft Room
+              {isCreating ? "Creating Draft Room..." : "Create Draft Room"}
             </Button>
           </div>
 
@@ -111,9 +147,15 @@ const Setup = () => {
                       className="bg-gray-800 border-lol-blue text-white flex-1"
                     />
                     <Button
-                      onClick={() => navigator.clipboard.writeText(
-                        `${window.location.origin}/draft/${draftId}?team=blue`
-                      )}
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/draft/${draftId}?team=blue`
+                        );
+                        toast({
+                          title: "Link Copied",
+                          description: "Blue team captain link copied to clipboard"
+                        });
+                      }}
                       className="bg-lol-blue hover:bg-blue-600"
                     >
                       Copy
@@ -132,9 +174,15 @@ const Setup = () => {
                       className="bg-gray-800 border-lol-red text-white flex-1"
                     />
                     <Button
-                      onClick={() => navigator.clipboard.writeText(
-                        `${window.location.origin}/draft/${draftId}?team=red`
-                      )}
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/draft/${draftId}?team=red`
+                        );
+                        toast({
+                          title: "Link Copied",
+                          description: "Red team captain link copied to clipboard"
+                        });
+                      }}
                       className="bg-lol-red hover:bg-red-600"
                     >
                       Copy
