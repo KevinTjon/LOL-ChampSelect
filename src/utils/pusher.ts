@@ -4,7 +4,12 @@ import Pusher from 'pusher-js';
 const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY ?? '', {
   cluster: import.meta.env.VITE_PUSHER_CLUSTER ?? '',
   forceTLS: true,
-  authEndpoint: '/api/pusher/auth'
+  authEndpoint: '/api/pusher/auth',
+  auth: {
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  }
 });
 
 // Helper function to get a draft channel
