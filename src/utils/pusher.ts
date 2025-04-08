@@ -4,9 +4,17 @@ import Pusher from 'pusher-js';
 const pusher = new Pusher(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PUSHER_KEY || '', {
   cluster: process.env.VITE_PUSHER_CLUSTER || import.meta.env.VITE_PUSHER_CLUSTER || '',
   forceTLS: true,
-  authEndpoint: '/api/pusher/auth',
+  channelAuthorization: {
+    endpoint: '/api/pusher/auth',
+    transport: 'ajax',
+    headers: {
+      // Add CSRF token if available
+      ...(typeof document !== 'undefined' && document.querySelector('meta[name="csrf-token"]')
+        ? { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '' }
+        : {}),
+    },
+  },
   enabledTransports: ['ws', 'wss'], // Only use WebSocket transport
-  timeout: 10000, // Connection timeout in ms
 });
 
 // Add debug logging
