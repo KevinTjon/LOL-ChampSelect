@@ -32,18 +32,21 @@ export async function POST(req: Request): Promise<Response> {
     let socketId: string | undefined;
     let channel: string | undefined;
 
-    // Handle URL-encoded form data
-    const formData = await req.formData().catch(() => null);
-    if (formData) {
-      socketId = formData.get('socket_id')?.toString();
-      channel = formData.get('channel_name')?.toString();
-      console.log('Form data parsed:', { socketId, channel });
-    }
+    // Get the raw text first
+    const rawBody = await req.text();
+    console.log('Raw request body:', rawBody);
 
-    // If form data parsing failed, try JSON
-    if (!socketId || !channel) {
+    // Try to parse as URLSearchParams first (for form data)
+    try {
+      const params = new URLSearchParams(rawBody);
+      socketId = params.get('socket_id') || undefined;
+      channel = params.get('channel_name') || undefined;
+      console.log('Form data parsed:', { socketId, channel });
+    } catch (e) {
+      console.log('Not valid form data, trying JSON');
+      // If not form data, try JSON
       try {
-        const jsonData = await req.clone().json() as PusherAuthRequestBody;
+        const jsonData = JSON.parse(rawBody) as PusherAuthRequestBody;
         socketId = jsonData.socket_id;
         channel = jsonData.channel_name;
         console.log('JSON data parsed:', { socketId, channel });
