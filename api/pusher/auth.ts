@@ -1,5 +1,5 @@
-const Pusher = require('pusher');
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import Pusher from 'pusher';
 
 const pusher = new Pusher({
   appId: process.env.PUSHER_APP_ID!,
@@ -9,12 +9,36 @@ const pusher = new Pusher({
   useTLS: true,
 });
 
-export default function handler(
-  request: VercelRequest,
-  response: VercelResponse,
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
 ) {
-  const { socket_id, channel_name } = request.body;
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-  const auth = pusher.authorizeChannel(socket_id, channel_name);
-  response.send(auth);
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const { socket_id, channel_name } = req.body;
+
+  try {
+    const auth = await pusher.authorizeChannel(socket_id, channel_name);
+    res.status(200).json(auth);
+  } catch (error) {
+    console.error('Pusher auth error:', error);
+    res.status(500).json({ error: 'Error authenticating channel' });
+  }
 } 
