@@ -1,16 +1,4 @@
 {
-  "routes": [
-    {
-      "src": "/api/pusher/auth",
-      "methods": ["POST"],
-      "dest": "/api/pusher/auth.ts"
-    },
-    {
-      "src": "/api/pusher/auth",
-      "methods": ["GET", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-      "status": 405
-    }
-  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
