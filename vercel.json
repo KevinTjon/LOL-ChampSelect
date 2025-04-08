@@ -3,7 +3,7 @@
     {
       "src": "/api/pusher/auth",
       "methods": ["POST"],
-      "dest": "/api/pusher/auth.cts"
+      "dest": "/api/pusher/auth.ts"
     },
     {
       "src": "/api/pusher/auth",
