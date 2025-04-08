@@ -5,8 +5,8 @@
   ],
   "build": {
     "env": {
-      "VITE_PUSHER_KEY": "@vite_pusher_key",
-      "VITE_PUSHER_CLUSTER": "@vite_pusher_cluster"
+      "VITE_PUSHER_KEY": "@pusher_key",
+      "VITE_PUSHER_CLUSTER": "@pusher_cluster"
     }
   }
 } 
