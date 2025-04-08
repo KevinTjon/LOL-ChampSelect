@@ -1,8 +1,8 @@
 import Pusher from 'pusher-js';
 
-// Initialize Pusher with your credentials
-const pusher = new Pusher(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PUSHER_KEY || '', {
-  cluster: process.env.VITE_PUSHER_CLUSTER || import.meta.env.VITE_PUSHER_CLUSTER || '',
+// Initialize Pusher with your credentials using import.meta.env for client-side
+const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY || '', {
+  cluster: import.meta.env.VITE_PUSHER_CLUSTER || '',
   forceTLS: true,
   channelAuthorization: {
     endpoint: '/api/pusher/auth',
@@ -18,10 +18,10 @@ const pusher = new Pusher(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PU
   enabledTransports: ['ws', 'wss'], // Only use WebSocket transport
 });
 
-// Add debug logging
+// Add debug logging using import.meta.env
 console.log('Pusher Environment Check:', {
-  keyExists: !!(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PUSHER_KEY),
-  clusterExists: !!(process.env.VITE_PUSHER_CLUSTER || import.meta.env.VITE_PUSHER_CLUSTER),
+  keyExists: !!import.meta.env.VITE_PUSHER_KEY,
+  clusterExists: !!import.meta.env.VITE_PUSHER_CLUSTER,
 });
 
 // Connection state handling
