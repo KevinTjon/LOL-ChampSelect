@@ -9,8 +9,7 @@ import DraftTimer from "../components/DraftTimer";
 import PhaseIndicator from "../components/PhaseIndicator";
 import ReadyCheck from "../components/ReadyCheck";
 import { useToast } from "@/components/ui/use-toast";
-import { toast } from 'react-hot-toast';
-import { draftChannel, unsubscribeFromDraft } from '../utils/pusher';
+import { draftChannel, unsubscribeFromDraft, isConnected, reconnect } from '../utils/pusher';
 
 interface DraftInfo {
   draftId: string;
@@ -69,32 +68,64 @@ const Index = () => {
     { team: "RED", champion: null, isActive: false, isBan: true },
     { team: "RED", champion: null, isActive: false, isBan: true }
   ]);
+  const [isConnecting, setIsConnecting] = useState(false);
   
   const isPickPhase = phases[currentPhase - 1]?.type === "PICK";
   const currentTeam = phases[currentPhase - 1]?.team || "BLUE";
   
   useEffect(() => {
     if (!draftId || !team || (team !== 'blue' && team !== 'red')) {
-      toast.error('Invalid draft link');
+      toast({
+        variant: "destructive",
+        title: "Invalid Link",
+        description: "Invalid draft link"
+      });
       navigate('/');
       return;
     }
-
-    // Load draft info from localStorage
-    const storedDraft = localStorage.getItem(`draft-${draftId}`);
-    if (!storedDraft) {
-      toast.error('Draft not found');
-      navigate('/');
-      return;
-    }
-
-    setDraftInfo(JSON.parse(storedDraft));
 
     // Subscribe to the draft channel
     const channel = draftChannel(draftId);
 
+    // Connection state handling
+    const handleConnectionChange = ({ current }: { current: string }) => {
+      switch (current) {
+        case 'connecting':
+          setIsConnecting(true);
+          toast({
+            title: "Connecting...",
+            description: "Attempting to connect to draft room"
+          });
+          break;
+        case 'connected':
+          setIsConnecting(false);
+          toast({
+            title: "Connected",
+            description: "Successfully connected to draft room"
+          });
+          // Request current state when reconnected
+          channel.trigger('client-request-state', { team });
+          break;
+        case 'disconnected':
+        case 'failed':
+          setIsConnecting(true);
+          toast({
+            variant: "destructive",
+            title: "Connection Lost",
+            description: "Attempting to reconnect..."
+          });
+          break;
+      }
+    };
+
+    // Listen for initial draft info
+    channel.bind('client-init-draft', (data: { draftInfo: DraftInfo, status: DraftStatus }) => {
+      setDraftInfo(data.draftInfo);
+      setStatus(data.status);
+    });
+
     // Listen for ready status updates
-    channel.bind('ready-update', (data: DraftStatus) => {
+    channel.bind('client-ready-update', (data: DraftStatus) => {
       setStatus(data);
       
       // Start draft if both teams are ready and not already starting
@@ -109,12 +140,18 @@ const Index = () => {
     // Listen for draft start
     channel.bind('client-start-draft', (data: DraftStatus) => {
       setStatus(data);
-      toast.success('Draft starting in 3 seconds...');
+      toast({
+        title: "Draft Starting",
+        description: "Draft starting in 3 seconds..."
+      });
       
       startTimeoutRef.current = window.setTimeout(() => {
         navigate(`/draft/${draftId}`);
       }, 3000);
     });
+
+    // Request current draft state when joining
+    channel.trigger('client-request-state', { team });
 
     return () => {
       if (startTimeoutRef.current) {
@@ -122,7 +159,7 @@ const Index = () => {
       }
       unsubscribeFromDraft(draftId);
     };
-  }, [draftId, team, navigate]);
+  }, [draftId, team, navigate, toast]);
 
   const updateReadyStatus = (isReady: boolean) => {
     if (!draftId || !team || status.isStarting) return;
@@ -285,58 +322,72 @@ const Index = () => {
   return (
     <div className="min-h-screen h-screen flex flex-col py-2 px-4">
       <div className="container mx-auto h-full flex flex-col relative">
+        {isConnecting && (
+          <div className="absolute top-0 left-0 right-0 bg-yellow-600 text-white text-center py-2">
+            Connecting to draft room...
+          </div>
+        )}
+        
         {!status.isStarting && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50">
             <div className="bg-gray-900 p-6 rounded-lg shadow-lg border border-lol-gold">
               <h2 className="text-2xl font-bold text-lol-gold text-center mb-6">Ready Check</h2>
-              <div className="flex gap-8">
-                <div className="text-center">
-                  <h3 className="text-lol-lightBlue font-semibold mb-2">Blue Team</h3>
-                  {team === "blue" ? (
-                    <button
-                      onClick={() => updateReadyStatus(!status.blueTeamReady)}
-                      className={`w-32 px-4 py-2 rounded ${
-                        status.blueTeamReady
-                          ? "bg-green-600 hover:bg-green-700"
-                          : "bg-gray-600 hover:bg-gray-700"
-                      }`}
-                    >
-                      {status.blueTeamReady ? "Ready!" : "Not Ready"}
-                    </button>
-                  ) : (
-                    <div className={`w-32 px-4 py-2 rounded ${
-                      status.blueTeamReady ? "bg-green-600" : "bg-gray-600"
-                    }`}>
-                      {status.blueTeamReady ? "Ready!" : "Not Ready"}
+              {isConnecting ? (
+                <div className="text-center text-yellow-400 mb-4">
+                  Connecting to draft room...
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-8">
+                    <div className="text-center">
+                      <h3 className="text-lol-lightBlue font-semibold mb-2">Blue Team</h3>
+                      {team === "blue" ? (
+                        <button
+                          onClick={() => updateReadyStatus(!status.blueTeamReady)}
+                          className={`w-32 px-4 py-2 rounded ${
+                            status.blueTeamReady
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-gray-600 hover:bg-gray-700"
+                          }`}
+                        >
+                          {status.blueTeamReady ? "Ready!" : "Not Ready"}
+                        </button>
+                      ) : (
+                        <div className={`w-32 px-4 py-2 rounded ${
+                          status.blueTeamReady ? "bg-green-600" : "bg-gray-600"
+                        }`}>
+                          {status.blueTeamReady ? "Ready!" : "Not Ready"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <h3 className="text-lol-red font-semibold mb-2">Red Team</h3>
+                      {team === "red" ? (
+                        <button
+                          onClick={() => updateReadyStatus(!status.redTeamReady)}
+                          className={`w-32 px-4 py-2 rounded ${
+                            status.redTeamReady
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-gray-600 hover:bg-gray-700"
+                          }`}
+                        >
+                          {status.redTeamReady ? "Ready!" : "Not Ready"}
+                        </button>
+                      ) : (
+                        <div className={`w-32 px-4 py-2 rounded ${
+                          status.redTeamReady ? "bg-green-600" : "bg-gray-600"
+                        }`}>
+                          {status.redTeamReady ? "Ready!" : "Not Ready"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {status.isStarting && (
+                    <div className="text-center mt-6 text-green-400">
+                      Both teams ready! Draft starting...
                     </div>
                   )}
-                </div>
-                <div className="text-center">
-                  <h3 className="text-lol-red font-semibold mb-2">Red Team</h3>
-                  {team === "red" ? (
-                    <button
-                      onClick={() => updateReadyStatus(!status.redTeamReady)}
-                      className={`w-32 px-4 py-2 rounded ${
-                        status.redTeamReady
-                          ? "bg-green-600 hover:bg-green-700"
-                          : "bg-gray-600 hover:bg-gray-700"
-                      }`}
-                    >
-                      {status.redTeamReady ? "Ready!" : "Not Ready"}
-                    </button>
-                  ) : (
-                    <div className={`w-32 px-4 py-2 rounded ${
-                      status.redTeamReady ? "bg-green-600" : "bg-gray-600"
-                    }`}>
-                      {status.redTeamReady ? "Ready!" : "Not Ready"}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {status.isStarting && (
-                <div className="text-center mt-6 text-green-400">
-                  Both teams ready! Draft starting...
-                </div>
+                </>
               )}
             </div>
           </div>

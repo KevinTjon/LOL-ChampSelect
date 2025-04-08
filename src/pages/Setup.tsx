@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { draftChannel } from '../utils/pusher';
 
 const Setup = () => {
   const [blueTeamName, setBlueTeamName] = useState("");
@@ -24,14 +25,28 @@ const Setup = () => {
     }
 
     const id = generateDraftId();
-    // Store draft info in localStorage
+    
+    // Create draft info
     const draftInfo = {
-      id,
+      draftId: id,
       blueTeamName,
       redTeamName,
       createdAt: new Date().toISOString(),
     };
-    localStorage.setItem(`draft_${id}`, JSON.stringify(draftInfo));
+
+    // Initialize the draft channel
+    const channel = draftChannel(id);
+    
+    // Send initial draft info through Pusher
+    channel.trigger('client-init-draft', {
+      draftInfo,
+      status: {
+        blueTeamReady: false,
+        redTeamReady: false,
+        isStarting: false
+      }
+    });
+
     setLinksGenerated(true);
   };
 
