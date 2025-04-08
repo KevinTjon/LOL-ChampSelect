@@ -1,12 +1,18 @@
 import Pusher from 'pusher-js';
 
 // Initialize Pusher with your credentials
-const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY ?? '', {
-  cluster: import.meta.env.VITE_PUSHER_CLUSTER ?? '',
+const pusher = new Pusher(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PUSHER_KEY || '', {
+  cluster: process.env.VITE_PUSHER_CLUSTER || import.meta.env.VITE_PUSHER_CLUSTER || '',
   forceTLS: true,
   authEndpoint: '/api/pusher/auth',
   enabledTransports: ['ws', 'wss'], // Only use WebSocket transport
   timeout: 10000, // Connection timeout in ms
+});
+
+// Add debug logging
+console.log('Pusher Environment Check:', {
+  keyExists: !!(process.env.VITE_PUSHER_KEY || import.meta.env.VITE_PUSHER_KEY),
+  clusterExists: !!(process.env.VITE_PUSHER_CLUSTER || import.meta.env.VITE_PUSHER_CLUSTER),
 });
 
 // Connection state handling
