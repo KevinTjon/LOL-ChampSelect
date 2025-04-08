@@ -11,17 +11,8 @@ const pusher = new Pusher({
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Log the method received
-  console.log('Auth request method:', req.method);
-
-  // --- Check Method --- 
-  if (req.method !== 'POST') {
-    console.warn(`Method ${req.method} not allowed.`);
-    res.setHeader('Allow', ['POST']);
-    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
-    return;
-  }
-  // --- End Check Method --- 
+  // Method check removed - handled by vercel.json routes
+  console.log('Auth request method (should be POST):', req.method);
 
   // Vercel automatically parses the body for common content types
   const socketId = req.body.socket_id as string;
