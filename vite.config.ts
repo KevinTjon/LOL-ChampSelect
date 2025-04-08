@@ -14,8 +14,4 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  define: {
-    'process.env.VITE_PUSHER_KEY': JSON.stringify(process.env.VITE_PUSHER_KEY),
-    'process.env.VITE_PUSHER_CLUSTER': JSON.stringify(process.env.VITE_PUSHER_CLUSTER),
-  }
 }));
