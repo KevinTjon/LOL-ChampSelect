@@ -44,40 +44,65 @@ const Setup = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // Initialize the draft channel and wait for subscription
+      // Initialize the draft channel
       const channel = draftChannel(id);
 
-      // Wait for subscription to succeed
-      await new Promise((resolve, reject) => {
-        channel.bind('pusher:subscription_succeeded', resolve);
-        channel.bind('pusher:subscription_error', reject);
-
-        // Timeout after 5 seconds
-        setTimeout(() => reject(new Error('Subscription timeout')), 5000);
-      });
-
-      // Now that we're subscribed, send the initial draft info
-      channel.trigger('client-init-draft', {
+      // Store draft info in localStorage first
+      localStorage.setItem(`draft-${id}`, JSON.stringify({
         draftInfo,
         status: {
           blueTeamReady: false,
           redTeamReady: false,
           isStarting: false
         }
+      }));
+
+      // Wait for subscription to succeed
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Subscription timeout'));
+        }, 5000);
+
+        channel.bind('pusher:subscription_succeeded', () => {
+          clearTimeout(timeoutId);
+          resolve(true);
+        });
+
+        channel.bind('pusher:subscription_error', (error: any) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
       });
 
-      setLinksGenerated(true);
-      toast({
-        title: "Draft Room Created",
-        description: "Share the links with team captains"
-      });
+      // Now that we're subscribed, trigger the event
+      try {
+        channel.trigger('client-init-draft', {
+          draftInfo,
+          status: {
+            blueTeamReady: false,
+            redTeamReady: false,
+            isStarting: false
+          }
+        });
+
+        setLinksGenerated(true);
+        toast({
+          title: "Draft Room Created",
+          description: "Share the links with team captains"
+        });
+      } catch (triggerError) {
+        throw new Error('Failed to initialize draft');
+      }
+
     } catch (error) {
       console.error('Error creating draft:', error);
+      localStorage.removeItem(`draft-${draftId}`); // Clean up if failed
       toast({
         variant: "destructive",
         title: "Error Creating Draft",
-        description: "Please try again"
+        description: "Please try again in a few moments"
       });
+      setDraftId(""); // Reset draft ID if failed
     } finally {
       setIsCreating(false);
     }
