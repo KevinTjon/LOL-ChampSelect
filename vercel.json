@@ -2,11 +2,5 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "build": {
-    "env": {
-      "VITE_PUSHER_KEY": "@pusher_key",
-      "VITE_PUSHER_CLUSTER": "@pusher_cluster"
-    }
-  }
+  ]
 } 
