@@ -1,6 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { pusherServer } from '@/lib/pusher-server';
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -17,35 +23,26 @@ export default async function handler(
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   try {
-    // Log raw request details
-    console.log('Auth request details:', {
-      contentType: req.headers['content-type'],
-      method: req.method
+    // Get raw body as string
+    const rawBody = await new Promise<string>((resolve, reject) => {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => resolve(body));
+      req.on('error', reject);
     });
 
-    // Get socket_id and channel_name from either body or parsed form data
-    let socket_id: string | undefined;
-    let channel_name: string | undefined;
+    // Parse the raw body
+    const params = new URLSearchParams(rawBody);
+    const socket_id = params.get('socket_id');
+    const channel_name = params.get('channel_name');
 
-    const contentType = req.headers['content-type'];
-    if (contentType?.includes('application/x-www-form-urlencoded')) {
-      // Handle form data
-      socket_id = req.body.socket_id;
-      channel_name = req.body.channel_name;
-    } else if (contentType?.includes('application/json')) {
-      // Handle JSON data
-      socket_id = req.body.socket_id;
-      channel_name = req.body.channel_name;
-    } else {
-      // Try to get data from raw body
-      socket_id = req.body?.socket_id;
-      channel_name = req.body?.channel_name;
-    }
-
-    console.log('Parsed auth parameters:', {
+    console.log('Auth request details:', {
       socketId: socket_id,
       channelName: channel_name,
-      body: req.body
+      rawBody,
+      contentType: req.headers['content-type']
     });
 
     if (!socket_id || !channel_name) {
@@ -64,8 +61,8 @@ export default async function handler(
     });
 
     const authResponse = pusherServer.authorizeChannel(
-      socket_id.toString(),
-      channel_name.toString()
+      socket_id,
+      channel_name
     );
 
     return res.status(200).json(authResponse);

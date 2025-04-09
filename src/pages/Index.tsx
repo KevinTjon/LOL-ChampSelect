@@ -9,7 +9,7 @@ import DraftTimer from "../components/DraftTimer";
 import PhaseIndicator from "../components/PhaseIndicator";
 import ReadyCheck from "../components/ReadyCheck";
 import { useToast } from "@/components/ui/use-toast";
-import { draftChannel, unsubscribeFromDraft, isConnected, reconnect } from '../utils/pusher';
+import { socketClient } from '../utils/socket';
 import { Button } from "@/components/ui/button";
 
 interface DraftInfo {
@@ -86,96 +86,123 @@ const Index = () => {
       return;
     }
 
-    let channel: any;
+    const socket = socketClient.getSocket();
+    if (!socket) {
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Failed to connect to server"
+      });
+      return;
+    }
 
-    const initializeChannel = async () => {
-      setIsConnecting(true);
-      try {
-        // Subscribe to the draft channel
-        channel = draftChannel(draftId);
+    setIsConnecting(true);
 
-        // Wait for subscription to succeed
-        await new Promise((resolve, reject) => {
-          channel.bind('pusher:subscription_succeeded', () => {
-            setIsSubscribed(true);
-            resolve(true);
-          });
-          channel.bind('pusher:subscription_error', reject);
+    // Join the draft room
+    socket.emit('join:draft', { draftId });
 
-          // Timeout after 5 seconds
-          setTimeout(() => reject(new Error('Subscription timeout')), 5000);
-        });
+    // Listen for draft initialization
+    socket.on('draft:initialized', (data: { draftInfo: DraftInfo, status: DraftStatus }) => {
+      setDraftInfo(data.draftInfo);
+      setStatus(data.status);
+      setIsConnecting(false);
+      setIsSubscribed(true);
+    });
 
-        // Listen for initial draft info
-        channel.bind('client-init-draft', (data: { draftInfo: DraftInfo, status: DraftStatus }) => {
-          setDraftInfo(data.draftInfo);
-          setStatus(data.status);
-        });
+    // Listen for team status updates
+    socket.on('team:status_updated', (newStatus: DraftStatus) => {
+      setStatus(newStatus);
+    });
 
-        // Listen for ready status updates
-        channel.bind('client-ready-update', (data: DraftStatus) => {
-          setStatus(data);
-          
-          // Start draft if both teams are ready and not already starting
-          if (data.blueTeamReady && data.redTeamReady && !data.isStarting) {
-            channel.trigger('client-start-draft', {
-              ...data,
-              isStarting: true
-            });
+    // Listen for draft starting
+    socket.on('draft:starting', (data: { status: DraftStatus }) => {
+      setStatus(data.status);
+      toast({
+        title: "Draft Starting",
+        description: "Draft starting in 3 seconds..."
+      });
+      
+      startTimeoutRef.current = window.setTimeout(() => {
+        navigate(`/draft/${draftId}`);
+      }, 3000);
+    });
+
+    // Listen for champion selections
+    socket.on('champion:selected', (data) => {
+      // Update the appropriate team's picks
+      if (data.team === 'BLUE') {
+        setBlueTeamPicks(prev => {
+          const newPicks = [...prev];
+          const index = newPicks.findIndex(pick => pick.position === data.position);
+          if (index !== -1) {
+            newPicks[index] = { ...newPicks[index], champion: data.champion };
           }
+          return newPicks;
         });
-
-        // Listen for draft start
-        channel.bind('client-start-draft', (data: DraftStatus) => {
-          setStatus(data);
-          toast({
-            title: "Draft Starting",
-            description: "Draft starting in 3 seconds..."
-          });
-          
-          startTimeoutRef.current = window.setTimeout(() => {
-            navigate(`/draft/${draftId}`);
-          }, 3000);
+      } else {
+        setRedTeamPicks(prev => {
+          const newPicks = [...prev];
+          const index = newPicks.findIndex(pick => pick.position === data.position);
+          if (index !== -1) {
+            newPicks[index] = { ...newPicks[index], champion: data.champion };
+          }
+          return newPicks;
         });
-
-        // Request current state
-        channel.trigger('client-request-state', { team });
-        setIsConnecting(false);
-
-      } catch (error) {
-        console.error('Error connecting to draft:', error);
-        toast({
-          variant: "destructive",
-          title: "Connection Error",
-          description: "Failed to connect to draft room"
-        });
-        setIsConnecting(false);
       }
-    };
+    });
 
-    initializeChannel();
+    // Listen for champion bans
+    socket.on('champion:banned', (data) => {
+      // Update the appropriate team's bans
+      if (data.team === 'BLUE') {
+        setBlueTeamBans(prev => {
+          const newBans = [...prev];
+          const index = newBans.findIndex(ban => !ban.champion);
+          if (index !== -1) {
+            newBans[index] = { ...newBans[index], champion: data.champion };
+          }
+          return newBans;
+        });
+      } else {
+        setRedTeamBans(prev => {
+          const newBans = [...prev];
+          const index = newBans.findIndex(ban => !ban.champion);
+          if (index !== -1) {
+            newBans[index] = { ...newBans[index], champion: data.champion };
+          }
+          return newBans;
+        });
+      }
+    });
 
     return () => {
       if (startTimeoutRef.current) {
         clearTimeout(startTimeoutRef.current);
       }
-      if (channel) {
-        unsubscribeFromDraft(draftId);
-      }
+      
+      // Clean up socket listeners
+      socket.off('draft:initialized');
+      socket.off('team:status_updated');
+      socket.off('draft:starting');
+      socket.off('champion:selected');
+      socket.off('champion:banned');
+      
+      // Leave the draft room
+      socket.emit('leave:draft', { draftId });
     };
   }, [draftId, team, navigate, toast]);
 
   const updateReadyStatus = (isReady: boolean) => {
     if (!draftId || !team || status.isStarting || !isSubscribed) return;
 
-    const channel = draftChannel(draftId);
-    const newStatus: DraftStatus = {
-      ...status,
-      [team === 'blue' ? 'blueTeamReady' : 'redTeamReady']: isReady
-    };
+    const socket = socketClient.getSocket();
+    if (!socket) return;
 
-    channel.trigger('client-ready-update', newStatus);
-    setStatus(newStatus);
+    socket.emit('team:ready', {
+      draftId,
+      team,
+      isReady
+    });
   };
 
   useEffect(() => {
