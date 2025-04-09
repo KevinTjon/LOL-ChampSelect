@@ -14,79 +14,39 @@ console.log('Pusher Server Environment Variables Check:', {
 
 export async function POST(request: Request) {
   try {
-    const contentType = request.headers.get('content-type');
-    console.log('Content-Type:', contentType);
+    // Get raw body as text
+    const rawBody = await request.text();
+    console.log('Raw request body:', rawBody);
 
-    let socketId: string | undefined;
-    let channel: string | undefined;
+    // Parse as URLSearchParams (Pusher sends form-urlencoded data)
+    const params = new URLSearchParams(rawBody);
+    const socketId = params.get('socket_id');
+    const channel = params.get('channel_name');
 
-    // Handle both form data and JSON formats
-    if (contentType?.includes('application/x-www-form-urlencoded')) {
-      const formData = await request.formData();
-      socketId = formData.get('socket_id')?.toString();
-      channel = formData.get('channel_name')?.toString();
-    } else if (contentType?.includes('application/json')) {
-      const jsonData = await request.json();
-      socketId = jsonData.socket_id;
-      channel = jsonData.channel_name;
-    } else {
-      // Fallback to raw body parsing
-      const rawBody = await request.text();
-      const params = new URLSearchParams(rawBody);
-      socketId = params.get('socket_id')?.toString();
-      channel = params.get('channel_name')?.toString();
-    }
-
-    console.log('Auth request data:', { socketId, channel });
+    console.log('Parsed auth data:', { socketId, channel });
 
     if (!socketId || !channel) {
       return NextResponse.json(
-        { 
-          error: 'Missing socket_id or channel_name',
-          received: { socketId, channel }
-        },
+        { error: 'Missing socket_id or channel_name' },
         { status: 400 }
       );
     }
 
-    // Log environment variables (safely)
-    console.log('Environment check:', {
-      appId: process.env.PUSHER_APP_ID?.substring(0, 4) + '...',
-      key: process.env.PUSHER_KEY?.substring(0, 4) + '...',
-      secretExists: !!process.env.PUSHER_SECRET,
-      cluster: process.env.PUSHER_CLUSTER
-    });
-
     // Authorize the channel
     try {
       const authResponse = pusherServer.authorizeChannel(socketId, channel);
-      console.log('Auth success:', { channel });
-      
-      // Set CORS headers
-      return NextResponse.json(authResponse, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
+      return NextResponse.json(authResponse);
     } catch (error) {
       console.error('Auth error:', error);
       return NextResponse.json(
-        { 
-          error: 'Authorization failed',
-          details: error instanceof Error ? error.message : String(error)
-        },
+        { error: 'Authorization failed' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Request handling error:', error);
+    console.error('Request error:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal Server Error',
-        details: error instanceof Error ? error.message : String(error)
-      },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }
