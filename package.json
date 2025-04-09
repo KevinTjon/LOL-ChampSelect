@@ -18,6 +18,7 @@
     "typescript": "5.3.3"
   },
   "devDependencies": {
+    "@types/socket.io-client": "^3.0.0",
     "nodemon": "3.0.3"
   },
   "engines": {
