@@ -5,18 +5,28 @@ class SocketClient {
   private socket: Socket | null = null;
 
   private constructor() {
-    // Get the Socket.IO server URL from environment variables
     const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
     
     this.socket = io(socketUrl, {
-      transports: ['websocket', 'polling'], // Prefer WebSocket
+      path: '/api/socket.io',
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 10000
     });
 
     this.socket.on('connect', () => {
       console.log('Connected to Socket.IO server');
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+      // Try to fall back to polling if websocket fails
+      if (this.socket?.io?.opts?.transports?.[0] === 'websocket') {
+        console.log('Falling back to polling transport');
+        this.socket.io.opts.transports = ['polling', 'websocket'];
+      }
     });
 
     this.socket.on('disconnect', () => {

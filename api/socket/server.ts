@@ -8,6 +8,7 @@ app.use(cors());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
+  path: '/api/socket.io',
   cors: {
     origin: process.env.ALLOWED_ORIGINS ? 
       process.env.ALLOWED_ORIGINS.split(',') : 
@@ -16,7 +17,13 @@ const io = new Server(httpServer, {
     credentials: true
   },
   transports: ['websocket', 'polling'],
-  path: '/api/socket'
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
+
+// Add a health check endpoint
+app.get('/api/socket/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 // Store active drafts
