@@ -4,6 +4,7 @@ import PusherClient from 'pusher-js';
 export const pusherClient = new PusherClient(import.meta.env.VITE_PUSHER_KEY, {
   cluster: import.meta.env.VITE_PUSHER_CLUSTER,
   forceTLS: true,
+  authEndpoint: '/api/pusher/auth'
 });
 
 // Helper function to subscribe to a private channel
