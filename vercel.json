@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/socket/server.ts",
+      "src": "server.ts",
       "use": "@vercel/node"
     },
     {
@@ -14,11 +14,11 @@
   "routes": [
     {
       "src": "/api/socket.io/(.*)",
-      "dest": "api/socket/server.ts"
+      "dest": "server.ts"
     },
     {
-      "src": "/api/socket/(.*)",
-      "dest": "api/socket/server.ts"
+      "src": "/(.*)",
+      "dest": "server.ts"
     },
     {
       "src": "^/assets/(.*)",
