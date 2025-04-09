@@ -11,14 +11,41 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
 
-  try {
-    const { socket_id, channel_name } = req.body;
+  // Set CORS headers first
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    console.log('Auth request received:', {
+  try {
+    // Log raw request details
+    console.log('Auth request details:', {
+      contentType: req.headers['content-type'],
+      method: req.method
+    });
+
+    // Get socket_id and channel_name from either body or parsed form data
+    let socket_id: string | undefined;
+    let channel_name: string | undefined;
+
+    const contentType = req.headers['content-type'];
+    if (contentType?.includes('application/x-www-form-urlencoded')) {
+      // Handle form data
+      socket_id = req.body.socket_id;
+      channel_name = req.body.channel_name;
+    } else if (contentType?.includes('application/json')) {
+      // Handle JSON data
+      socket_id = req.body.socket_id;
+      channel_name = req.body.channel_name;
+    } else {
+      // Try to get data from raw body
+      socket_id = req.body?.socket_id;
+      channel_name = req.body?.channel_name;
+    }
+
+    console.log('Parsed auth parameters:', {
       socketId: socket_id,
       channelName: channel_name,
-      body: req.body,
-      contentType: req.headers['content-type']
+      body: req.body
     });
 
     if (!socket_id || !channel_name) {
@@ -40,11 +67,6 @@ export default async function handler(
       socket_id.toString(),
       channel_name.toString()
     );
-
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     return res.status(200).json(authResponse);
   } catch (error) {
