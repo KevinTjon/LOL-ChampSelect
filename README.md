@@ -1,80 +1,53 @@
-# LOL Champ Select
+# LOL Champion Select - Socket.IO Server
 
-A League of Legends champion selection and draft arena application.
-
-## Getting Started
-
-1. Clone the repository
-2. Install dependencies:
-```bash
-npm install
-```
-3. Start the development server:
-```bash
-npm run dev
-```
+This is the WebSocket server for the LOL Champion Select application. It handles real-time communication between clients during the champion selection process.
 
 ## Features
 
-- Champion selection interface
-- Draft arena functionality
-- Real-time updates
-
-## Technologies Used
-
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui components
+- Real-time champion selection updates
+- Draft room management
+- Team ready status synchronization
+- WebSocket with fallback to polling
 
 ## Development
 
-The project uses:
-- React with TypeScript for the frontend
-- Vite as the build tool
-- Tailwind CSS for styling
-- shadcn/ui for component library
-- React Router for navigation
-- React Query for data fetching
-- Zod for validation
+1. Install dependencies:
+```bash
+npm install
+```
 
-## Deployment
-
-This project can be deployed to any static hosting service that supports Vite/React applications, such as:
-- Vercel
-- Netlify
-- GitHub Pages
-- AWS Amplify
-- Firebase Hosting
-
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The server will run on port 3001 by default.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Production
 
-**Use GitHub Codespaces**
+The server is designed to be deployed on Railway. It will automatically use the PORT environment variable provided by the platform.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Environment Variables
+
+- `PORT` - The port to run the server on (default: 3001)
+- `NODE_ENV` - The environment to run in ('development' or 'production')
+
+## API
+
+The server uses Socket.IO for real-time communication. Here are the available events:
+
+### Client -> Server
+
+- `join:draft` - Join a draft room
+- `draft:init` - Initialize a new draft
+- `champion:select` - Select a champion
+- `champion:ban` - Ban a champion
+- `team:ready` - Update team ready status
+
+### Server -> Client
+
+- `draft:initialized` - Draft has been initialized
+- `champion:selected` - A champion has been selected
+- `champion:banned` - A champion has been banned
+- `team:status_updated` - Team ready status has changed
+- `draft:starting` - Draft is starting (when both teams are ready)

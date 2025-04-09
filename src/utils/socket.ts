@@ -5,10 +5,12 @@ class SocketClient {
   private socket: Socket | null = null;
 
   private constructor() {
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+    // Use Railway for WebSocket server in production
+    const socketUrl = import.meta.env.PROD ? 
+      'https://lol-champ-select-socket.up.railway.app' : 
+      'http://localhost:3001';
     
     this.socket = io(socketUrl, {
-      path: '/api/socket.io',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
